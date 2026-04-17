@@ -52,6 +52,12 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
   useEffect(() => {
     let isCancelled = false;
     const container = containerRef.current;
+    const renderId = `mermaid-diagram-${diagramId}`;
+
+    const removeOrphanedNodes = () => {
+      document.getElementById(renderId)?.remove();
+      document.getElementById(`d${renderId}`)?.remove();
+    };
 
     const renderDiagram = async () => {
       if (!container) return;
@@ -67,13 +73,20 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
           theme: mermaidTheme,
         });
 
-        const { svg, bindFunctions } = await mermaid.render(`mermaid-diagram-${diagramId}`, chart);
+        // Validate first so syntax errors don't leak mermaid's error SVG into document.body.
+        await mermaid.parse(chart);
 
-        if (isCancelled) return;
+        const { svg, bindFunctions } = await mermaid.render(renderId, chart);
+
+        if (isCancelled) {
+          removeOrphanedNodes();
+          return;
+        }
 
         container.innerHTML = svg;
         bindFunctions?.(container);
       } catch (error) {
+        removeOrphanedNodes();
         if (isCancelled) return;
 
         container.innerHTML = '';
@@ -86,6 +99,7 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
 
     return () => {
       isCancelled = true;
+      removeOrphanedNodes();
       if (container) {
         container.innerHTML = '';
       }
