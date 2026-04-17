@@ -23,6 +23,7 @@ import {
   readStdin,
 } from './utils.js';
 import { createCommentCommand } from './comment.js';
+import { loadDescription } from './description.js';
 import { getPrPatch, getPrCommentImports } from './github.js';
 import { warnAboutTuiDeprecation } from './tuiDeprecation.js';
 
@@ -172,6 +173,7 @@ interface CliOptions {
   background?: boolean;
   context?: number;
   mergeBase?: boolean;
+  description?: string;
 }
 
 const BACKGROUND_CHILD_ENV = 'DIFIT_BACKGROUND_CHILD';
@@ -219,6 +221,10 @@ program
     '--merge-base',
     'resolve the base revision with git merge-base before diffing (Git revision mode only)',
   )
+  .option(
+    '--description <path>',
+    'path to a Markdown file (.md/.markdown) shown as a Description tab in the UI',
+  )
   .action(async (commitish: string, compareWith: string | undefined, options: CliOptions) => {
     try {
       const isBackgroundChild = process.env[BACKGROUND_CHILD_ENV] === '1';
@@ -254,6 +260,23 @@ program
       if (backgroundMode) {
         options.keepAlive = true;
         options.open = false;
+      }
+
+      let descriptionContent: string | undefined;
+      if (options.description !== undefined) {
+        if (options.tui) {
+          console.error('Error: --description option cannot be used with --tui');
+          process.exit(1);
+        }
+
+        try {
+          descriptionContent = loadDescription(options.description).content;
+        } catch (error) {
+          console.error(
+            `Error: ${error instanceof Error ? error.message : 'Invalid --description value'}`,
+          );
+          process.exit(1);
+        }
       }
 
       if (options.pr) {
@@ -333,6 +356,7 @@ program
           clearComments: options.clean,
           keepAlive: options.keepAlive,
           ...(commentImports.length > 0 ? { commentImports } : {}),
+          ...(descriptionContent !== undefined ? { descriptionContent } : {}),
         });
 
         if (backgroundMode) {
@@ -429,6 +453,7 @@ program
         diffMode: determineDiffMode(selection, compareWith),
         repoPath,
         ...(commentImports.length > 0 ? { commentImports } : {}),
+        ...(descriptionContent !== undefined ? { descriptionContent } : {}),
       });
 
       if (backgroundMode) {

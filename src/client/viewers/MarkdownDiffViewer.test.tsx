@@ -13,6 +13,7 @@ import type { DiffViewerBodyProps } from './types';
 vi.mock('mermaid', () => ({
   default: {
     initialize: vi.fn(),
+    parse: vi.fn().mockResolvedValue(true),
     render: vi.fn().mockResolvedValue({
       svg: '<svg><title>Mermaid</title></svg>',
       bindFunctions: undefined,

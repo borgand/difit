@@ -452,6 +452,29 @@ describe('Server Integration Tests', () => {
       );
     });
 
+    it('GET /api/diff returns description when provided', async () => {
+      const descriptionServer = await startServer({
+        selection: { targetCommitish: 'HEAD', baseCommitish: 'HEAD^' },
+        preferredPort: 9055,
+        descriptionContent: '# Rationale\n\nExplains *why* this change exists.',
+      });
+      servers.push(descriptionServer.server);
+
+      const response = await fetch(`http://localhost:${descriptionServer.port}/api/diff`);
+      const data = (await response.json()) as any;
+
+      expect(response.ok).toBe(true);
+      expect(data.description).toBe('# Rationale\n\nExplains *why* this change exists.');
+    });
+
+    it('GET /api/diff returns null description when not provided', async () => {
+      const response = await fetch(`http://localhost:${port}/api/diff`);
+      const data = (await response.json()) as any;
+
+      expect(response.ok).toBe(true);
+      expect(data.description).toBeNull();
+    });
+
     it('GET /api/diff returns comment import payload when configured', async () => {
       const importedComments: CommentImport[] = [
         {

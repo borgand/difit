@@ -54,6 +54,7 @@ interface ServerOptions {
   diffMode?: DiffMode;
   repoPath?: string;
   contextLines?: number;
+  descriptionContent?: string;
 }
 
 const GENERATED_STATUS_CACHE_TTL_MS = 60_000;
@@ -331,6 +332,7 @@ export async function startServer(
       repositoryId,
       commentImports: shouldIncludeCommentImports ? initialCommentImports : undefined,
       commentImportId: shouldIncludeCommentImports ? commentImportId : undefined,
+      description: options.descriptionContent ?? null,
     });
   });
 

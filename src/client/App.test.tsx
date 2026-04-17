@@ -1047,3 +1047,59 @@ describe('App Component - Mobile sidebar auto-close', () => {
     });
   });
 });
+
+describe('App Component - Description tab', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockComments = [];
+    mockApplyCommentImports.mockReset();
+    mockApplyCommentImports.mockReturnValue([]);
+  });
+
+  it('does not render tabs when description is absent', async () => {
+    mockFetch(mockDiffResponse);
+    renderApp();
+
+    // Wait for diff content to render
+    await screen.findByTitle('test.ts');
+
+    expect(screen.queryByRole('tab', { name: 'Description' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Files' })).not.toBeInTheDocument();
+  });
+
+  it('renders tabs and shows the description content by default when provided', async () => {
+    mockFetch({
+      ...mockDiffResponse,
+      description: '# Overview\n\nExplains the change.',
+    });
+    renderApp();
+
+    const descriptionTab = await screen.findByRole('tab', { name: 'Description' });
+    const filesTab = screen.getByRole('tab', { name: 'Files' });
+    expect(descriptionTab).toHaveAttribute('aria-selected', 'true');
+    expect(filesTab).toHaveAttribute('aria-selected', 'false');
+
+    const article = await screen.findByTestId('description-view');
+    expect(article).toHaveTextContent('Overview');
+    expect(article).toHaveTextContent('Explains the change.');
+
+    expect(screen.queryByTitle('test.ts')).not.toBeInTheDocument();
+  });
+
+  it('switches to the Files tab when clicked', async () => {
+    mockFetch({
+      ...mockDiffResponse,
+      description: '# Overview',
+    });
+    renderApp();
+
+    await screen.findByTestId('description-view');
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Files' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('description-view')).not.toBeInTheDocument();
+    });
+    expect(await screen.findByTitle('test.ts')).toBeInTheDocument();
+  });
+});

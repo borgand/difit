@@ -22,6 +22,7 @@ import {
 
 import { Checkbox } from './components/Checkbox';
 import { CommentsDropdown } from './components/CommentsDropdown';
+import { DescriptionView } from './components/DescriptionView';
 import { CommentsListModal } from './components/CommentsListModal';
 import { DiffQuickMenu } from './components/DiffQuickMenu';
 import { DiffViewer } from './components/DiffViewer';
@@ -110,6 +111,8 @@ function App() {
   const [hasTriggeredSparkles, setHasTriggeredSparkles] = useState(false);
   const [isCommentsListOpen, setIsCommentsListOpen] = useState(false);
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'description' | 'files'>('files');
+  const hasUserSelectedTabRef = useRef(false);
   const [collapsedFiles, setCollapsedFiles] = useState<Set<string>>(new Set());
   const collapsedInitializedRef = useRef(false);
   const diffScrollContainerRef = useRef<HTMLElement | null>(null);
@@ -626,6 +629,12 @@ function App() {
   useEffect(() => {
     void fetchDiffData();
   }, [fetchDiffData]);
+
+  useEffect(() => {
+    if (!hasUserSelectedTabRef.current && diffData?.description) {
+      setActiveTab('description');
+    }
+  }, [diffData?.description]);
 
   useEffect(() => {
     return () => {
@@ -1151,6 +1160,46 @@ function App() {
             </div>
           </div>
         </header>
+        {diffData.description && (
+          <div
+            role="tablist"
+            aria-label="View"
+            className="flex items-center gap-1 border-b border-github-border bg-github-bg-secondary px-4"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'description'}
+              onClick={() => {
+                hasUserSelectedTabRef.current = true;
+                setActiveTab('description');
+              }}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'description'
+                  ? 'text-github-text-primary border-github-accent'
+                  : 'text-github-text-secondary border-transparent hover:text-github-text-primary'
+              }`}
+            >
+              Description
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'files'}
+              onClick={() => {
+                hasUserSelectedTabRef.current = true;
+                setActiveTab('files');
+              }}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === 'files'
+                  ? 'text-github-text-primary border-github-accent'
+                  : 'text-github-text-secondary border-transparent hover:text-github-text-primary'
+              }`}
+            >
+              Files
+            </button>
+          </div>
+        )}
         {revisionOptions && (
           <RevisionDetailModal
             key={isRevisionModalOpen ? getDiffSelectionKey(selectedRevision) : 'closed'}
@@ -1164,7 +1213,7 @@ function App() {
           />
         )}
 
-        {isMobile && isFileTreeOpen && (
+        {isMobile && isFileTreeOpen && activeTab !== 'description' && (
           <button
             type="button"
             aria-label="Close file tree"
@@ -1173,158 +1222,162 @@ function App() {
           />
         )}
 
-        <div className="flex flex-1 overflow-hidden relative">
-          <div
-            className={`relative overflow-hidden ${!isDragging ? '!transition-all !duration-300 !ease-in-out' : ''}`}
-            style={{
-              width: isMobile ? '0px' : isFileTreeOpen ? `${sidebarWidth}px` : '0px',
-            }}
-          >
-            <aside
-              id="file-tree-panel"
-              className={`bg-github-bg-secondary overflow-y-auto flex flex-col ${
-                isMobile
-                  ? 'fixed inset-y-0 right-0 z-40 w-[min(85vw,360px)] border-l border-github-border transition-transform duration-300 ease-out'
-                  : 'relative border-r border-github-border'
-              }`}
+        {diffData.description && activeTab === 'description' ? (
+          <DescriptionView content={diffData.description} syntaxTheme={settings.syntaxTheme} />
+        ) : (
+          <div className="flex flex-1 overflow-hidden relative">
+            <div
+              className={`relative overflow-hidden ${!isDragging ? '!transition-all !duration-300 !ease-in-out' : ''}`}
               style={{
-                width: isMobile ? 'min(85vw, 360px)' : `${sidebarWidth}px`,
-                minWidth: isMobile ? '0px' : '200px',
-                maxWidth: isMobile ? 'none' : '600px',
-                height: '100%',
-                transform: isMobile
-                  ? isFileTreeOpen
-                    ? 'translateX(0)'
-                    : 'translateX(100%)'
-                  : undefined,
+                width: isMobile ? '0px' : isFileTreeOpen ? `${sidebarWidth}px` : '0px',
               }}
             >
-              <div className="flex-1 overflow-y-auto">
-                <FileList
-                  files={diffData.files}
-                  onScrollToFile={scrollFileIntoDiffContainer}
-                  onFileSelected={isMobile ? handleMobileFileSelected : undefined}
-                  comments={normalizedThreads}
-                  reviewedFiles={viewedFiles}
-                  onToggleReviewed={toggleFileReviewed}
-                  selectedFileIndex={cursor?.fileIndex ?? null}
-                />
-              </div>
-              {!isMobile && (
-                <div className="p-4 border-t border-github-border flex justify-between items-center">
-                  <button
-                    onClick={() => setIsHelpOpen(true)}
-                    className="flex items-center gap-1.5 text-github-text-secondary hover:text-github-text-primary transition-colors"
-                    title="Keyboard shortcuts (Shift+?)"
-                  >
-                    <Keyboard size={16} />
-                    <span className="text-sm">Shortcuts</span>
-                  </button>
-                  <a
-                    href="https://github.com/yoshiko-pg/difit"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-github-text-secondary hover:text-github-text-primary transition-colors"
-                    title="View on GitHub"
-                  >
-                    <span className="text-sm">Star on GitHub</span>
-                    <GitHubIcon style={{ height: '18px', width: '18px' }} />
-                  </a>
+              <aside
+                id="file-tree-panel"
+                className={`bg-github-bg-secondary overflow-y-auto flex flex-col ${
+                  isMobile
+                    ? 'fixed inset-y-0 right-0 z-40 w-[min(85vw,360px)] border-l border-github-border transition-transform duration-300 ease-out'
+                    : 'relative border-r border-github-border'
+                }`}
+                style={{
+                  width: isMobile ? 'min(85vw, 360px)' : `${sidebarWidth}px`,
+                  minWidth: isMobile ? '0px' : '200px',
+                  maxWidth: isMobile ? 'none' : '600px',
+                  height: '100%',
+                  transform: isMobile
+                    ? isFileTreeOpen
+                      ? 'translateX(0)'
+                      : 'translateX(100%)'
+                    : undefined,
+                }}
+              >
+                <div className="flex-1 overflow-y-auto">
+                  <FileList
+                    files={diffData.files}
+                    onScrollToFile={scrollFileIntoDiffContainer}
+                    onFileSelected={isMobile ? handleMobileFileSelected : undefined}
+                    comments={normalizedThreads}
+                    reviewedFiles={viewedFiles}
+                    onToggleReviewed={toggleFileReviewed}
+                    selectedFileIndex={cursor?.fileIndex ?? null}
+                  />
                 </div>
-              )}
-            </aside>
-          </div>
+                {!isMobile && (
+                  <div className="p-4 border-t border-github-border flex justify-between items-center">
+                    <button
+                      onClick={() => setIsHelpOpen(true)}
+                      className="flex items-center gap-1.5 text-github-text-secondary hover:text-github-text-primary transition-colors"
+                      title="Keyboard shortcuts (Shift+?)"
+                    >
+                      <Keyboard size={16} />
+                      <span className="text-sm">Shortcuts</span>
+                    </button>
+                    <a
+                      href="https://github.com/yoshiko-pg/difit"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-github-text-secondary hover:text-github-text-primary transition-colors"
+                      title="View on GitHub"
+                    >
+                      <span className="text-sm">Star on GitHub</span>
+                      <GitHubIcon style={{ height: '18px', width: '18px' }} />
+                    </a>
+                  </div>
+                )}
+              </aside>
+            </div>
 
-          {!isMobile && (
-            <div
-              className={`bg-github-border hover:bg-github-text-muted cursor-col-resize ${!isDragging ? '!transition-all !duration-300 !ease-in-out' : ''}`}
-              style={{
-                width: isFileTreeOpen ? '4px' : '0px',
-              }}
-              onMouseDown={handleMouseDown}
-              title="Drag to resize file list"
-            />
-          )}
+            {!isMobile && (
+              <div
+                className={`bg-github-border hover:bg-github-text-muted cursor-col-resize ${!isDragging ? '!transition-all !duration-300 !ease-in-out' : ''}`}
+                style={{
+                  width: isFileTreeOpen ? '4px' : '0px',
+                }}
+                onMouseDown={handleMouseDown}
+                title="Drag to resize file list"
+              />
+            )}
 
-          <main
-            ref={diffScrollContainerRef}
-            className={`flex-1 overflow-y-auto ${showMobileCommentsBar ? 'pb-16' : ''}`}
-          >
-            {diffData.files.map((file, fileIndex) => {
-              const fileThreads = threadsByFile.get(file.path) ?? EMPTY_COMMENT_THREADS;
-              const mergedChunks =
-                getMergedChunksForVersion(mergedChunksState, diffDataVersion, file.path) ??
-                EMPTY_MERGED_CHUNKS;
-              const isRendered = renderedFilePaths.has(file.path);
-              return (
-                <div
-                  key={file.path}
-                  id={getFileElementId(file.path)}
-                  data-file-path={file.path}
-                  data-rendered={isRendered ? 'true' : 'false'}
-                  ref={(node) => registerLazyFileContainer(file.path, node)}
-                  className="mb-6"
-                >
-                  {isRendered ? (
-                    <DiffViewer
-                      file={file}
-                      threads={fileThreads}
-                      showAuthorBadges={showAuthorBadges}
-                      diffMode={diffMode}
-                      reviewedFiles={viewedFiles}
-                      onToggleReviewed={toggleFileReviewed}
-                      collapsedFiles={collapsedFiles}
-                      onToggleCollapsed={toggleFileCollapsed}
-                      onToggleAllCollapsed={toggleAllFilesCollapsed}
-                      onAddComment={handleAddComment}
-                      onGenerateThreadPrompt={handleGenerateThreadPrompt}
-                      onRemoveThread={removeThread}
-                      onReplyToThread={handleReplyToThread}
-                      onRemoveMessage={removeMessage}
-                      onUpdateMessage={updateMessage}
-                      onOpenInEditor={canOpenInEditor ? handleOpenInEditor : undefined}
-                      syntaxTheme={settings.syntaxTheme}
-                      baseCommitish={diffData.baseCommitish}
-                      targetCommitish={diffData.targetCommitish}
-                      cursor={cursor?.fileIndex === fileIndex ? cursor : null}
-                      fileIndex={fileIndex}
-                      onLineClick={handleLineClick}
-                      commentTrigger={
-                        commentTrigger?.fileIndex === fileIndex ? commentTrigger : null
-                      }
-                      onCommentTriggerHandled={handleCommentTriggerHandled}
-                      mergedChunks={mergedChunks}
-                      expandLines={expandLines}
-                      expandAllBetweenChunks={expandAllBetweenChunks}
-                      prefetchFileContent={prefetchFileContent}
-                      isExpandLoading={isExpandLoading}
-                    />
-                  ) : (
-                    <div className="bg-github-bg-secondary border border-github-border rounded-md px-4 py-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-xs uppercase tracking-wide text-github-text-muted">
-                            Deferred Rendering
+            <main
+              ref={diffScrollContainerRef}
+              className={`flex-1 overflow-y-auto ${showMobileCommentsBar ? 'pb-16' : ''}`}
+            >
+              {diffData.files.map((file, fileIndex) => {
+                const fileThreads = threadsByFile.get(file.path) ?? EMPTY_COMMENT_THREADS;
+                const mergedChunks =
+                  getMergedChunksForVersion(mergedChunksState, diffDataVersion, file.path) ??
+                  EMPTY_MERGED_CHUNKS;
+                const isRendered = renderedFilePaths.has(file.path);
+                return (
+                  <div
+                    key={file.path}
+                    id={getFileElementId(file.path)}
+                    data-file-path={file.path}
+                    data-rendered={isRendered ? 'true' : 'false'}
+                    ref={(node) => registerLazyFileContainer(file.path, node)}
+                    className="mb-6"
+                  >
+                    {isRendered ? (
+                      <DiffViewer
+                        file={file}
+                        threads={fileThreads}
+                        showAuthorBadges={showAuthorBadges}
+                        diffMode={diffMode}
+                        reviewedFiles={viewedFiles}
+                        onToggleReviewed={toggleFileReviewed}
+                        collapsedFiles={collapsedFiles}
+                        onToggleCollapsed={toggleFileCollapsed}
+                        onToggleAllCollapsed={toggleAllFilesCollapsed}
+                        onAddComment={handleAddComment}
+                        onGenerateThreadPrompt={handleGenerateThreadPrompt}
+                        onRemoveThread={removeThread}
+                        onReplyToThread={handleReplyToThread}
+                        onRemoveMessage={removeMessage}
+                        onUpdateMessage={updateMessage}
+                        onOpenInEditor={canOpenInEditor ? handleOpenInEditor : undefined}
+                        syntaxTheme={settings.syntaxTheme}
+                        baseCommitish={diffData.baseCommitish}
+                        targetCommitish={diffData.targetCommitish}
+                        cursor={cursor?.fileIndex === fileIndex ? cursor : null}
+                        fileIndex={fileIndex}
+                        onLineClick={handleLineClick}
+                        commentTrigger={
+                          commentTrigger?.fileIndex === fileIndex ? commentTrigger : null
+                        }
+                        onCommentTriggerHandled={handleCommentTriggerHandled}
+                        mergedChunks={mergedChunks}
+                        expandLines={expandLines}
+                        expandAllBetweenChunks={expandAllBetweenChunks}
+                        prefetchFileContent={prefetchFileContent}
+                        isExpandLoading={isExpandLoading}
+                      />
+                    ) : (
+                      <div className="bg-github-bg-secondary border border-github-border rounded-md px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-xs uppercase tracking-wide text-github-text-muted">
+                              Deferred Rendering
+                            </div>
+                            <div className="text-sm font-mono text-github-text-primary truncate">
+                              {file.path}
+                            </div>
                           </div>
-                          <div className="text-sm font-mono text-github-text-primary truncate">
-                            {file.path}
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => ensureFileRendered(file.path)}
+                            className="px-3 py-1.5 text-xs rounded border border-github-border text-github-text-secondary hover:text-github-text-primary hover:bg-github-bg-tertiary"
+                          >
+                            Load now
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => ensureFileRendered(file.path)}
-                          className="px-3 py-1.5 text-xs rounded border border-github-border text-github-text-secondary hover:text-github-text-primary hover:bg-github-bg-tertiary"
-                        >
-                          Load now
-                        </button>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </main>
-        </div>
+                    )}
+                  </div>
+                );
+              })}
+            </main>
+          </div>
+        )}
 
         {showMobileCommentsBar && (
           <div className="fixed bottom-0 left-0 right-0 z-20 bg-github-bg-secondary border-t border-github-border px-4 py-2 flex justify-end">
