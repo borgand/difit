@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Describe Changes'
+  short_description: 'Write a rationale-first Markdown description of code changes and open it for review.'
+  default_prompt: 'Use $describe-changes to produce a layered description of the current changes (rationale, approach, diagram, code walk-through, risks) and show it to the user.'

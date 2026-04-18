@@ -61,7 +61,7 @@ For uncommitted changes, if files not yet added to git should also appear in the
 
 ## Rationale-first description (optional)
 
-For non-trivial changes — multi-file edits, architectural changes, anything where the reviewer needs to understand _why_ before they can judge _what_ — use the `difit-describe` skill to write a layered Markdown description (rationale → approach → Mermaid diagram → code walk-through) to a temp file and pass it to difit with `--description <path>`. It renders as a Description tab that opens by default.
+For non-trivial changes — multi-file edits, architectural changes, anything where the reviewer needs to understand _why_ before they can judge _what_ — use the `describe-changes` skill to write a layered Markdown description (rationale → approach → Mermaid diagram → code walk-through) to a temp file and pass it to difit with `--description <path>`. It renders as a Description tab that opens by default.
 
 ## Constraints
 

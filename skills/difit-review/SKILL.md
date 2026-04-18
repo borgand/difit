@@ -7,8 +7,8 @@ description: A skill for reviewing a specific diff and showing the findings as c
 
 ## Overview
 
-This skill launches a requested git diff in a viewer that is easy for humans to read. At the same time, the agent can attach arbitrary comments via the `--comment` option.
-This comment mechanism is well suited for code review findings and code explanations.
+This skill launches a requested git diff in a viewer that is easy for humans to read. At the same time, the agent can attach arbitrary comments via the `--comment` option and, for non-trivial changes, a rationale-first description via `--description`.
+
 Before running commands, choose `<difit-command>` using the following rule:
 
 - If `command -v difit` succeeds, use `difit`.
@@ -17,38 +17,63 @@ Before running commands, choose `<difit-command>` using the following rule:
 
 ## Steps
 
-The final command typically looks like this:
+1. **Identify the target diff and run code review.**
+   - Inspect the diff specified by the user. This may be a local git revision, a GitHub URL, a patch file, or something similar.
+   - Check which code reviewer skills are available (e.g. `code-reviewer`, `security-reviewer`, `silent-failure-hunter`). These apply to code changes only — skip this step for diffs that are purely non-code (Markdown, YAML, skill definitions, config files). If applicable, invoke them now and collect their findings as the basis for `--comment` entries.
+   - For PR reviews, inspect the PR locally and keep the review result limited to difit output. Do not post comments back to remote GitHub.
 
-```bash
-<difit-command> <target> [compare-with] \
-  --comment '{"type":"thread","filePath":"src/foobar.ts","position":{"side":"old","line":102},"body":"line 1\nline 2"}' \
-  --comment '{"type":"thread","filePath":"src/example.ts","position":{"side":"new","line":{"start":36,"end":39}},"body":"Range comment for L36-L39"}'
-```
+2. **Judge whether the change is non-trivial.**
 
-The detailed procedure is as follows.
+   A change is non-trivial if any of these apply:
+   - More than ~20–50 lines changed across the diff.
+   - Spans multiple files in a non-mechanical way.
+   - Introduces or removes a concept, changes architecture, or alters a shared interface.
+   - Small-but-surprising: the bug fix root cause lies outside the obvious spot, a contributing bug is fixed alongside the stated change, or there are non-obvious ordering or invariant constraints a reviewer unfamiliar with the codebase would question.
 
-1. Identify the target diff and review its contents.
+   If non-trivial, continue to step 3. Otherwise skip to step 4.
 
-- Inspect the diff specified by the user. This may be a local git revision, a GitHub URL, a patch file, or something similar.
-- Understand the diff normally, inspect surrounding code when needed, and think through the response required by the user's request, whether that is review findings, explanations, or something else.
-- For PR reviews, inspect the PR locally and keep the review result limited to difit output. Do not post comments back to remote GitHub.
+3. **Generate a description using the `describe-changes` skill.**
 
-2. Attach the prepared comments and launch difit.
+   Create a temp file path and pass it to `describe-changes` as the output path:
 
-- **difit launch options**
-  - Use `<difit-command> <target> [compare-with]` to specify the target diff.
-  - For uncommitted changes use `<difit-command> .`, for working tree changes use `<difit-command> working`, and for staged changes use `<difit-command> staging`.
-  - For stdin input, use a form such as `diff -u file1.txt file2.txt | <difit-command>`.
-- **Comment arguments**
-  - Use `type: "thread"` for each comment.
-  - Write comment bodies in the language the user is using.
-  - Use `position.side: "new"` for lines that exist on the target side of the diff.
-  - Use `position.side: "old"` for lines that exist only on the deleted side.
-  - Use range comments for issues that span multiple lines.
-  - Never copy secrets, tokens, passwords, API keys, private keys, or other credential-like material from the diff into `--comment` bodies or any command-line arguments.
-- **Additional argument for files not yet added to git**
-  - For uncommitted changes, if you decide files not yet added to git should also appear in the diff, add `--include-untracked`.
+   ```bash
+   DESC_FILE="${TMPDIR}difit-desc-$$.md"
+   ```
 
-3. Share the difit URL and finish the response.
+   Invoke the `describe-changes` skill, passing `output_path="$DESC_FILE"` as the args string. It will write a layered Markdown description (rationale → approach → diagram → code walk-through → risks) to that file and skip the editor-open/preview step since a path was supplied.
+
+4. **Attach the prepared comments and launch difit.**
+
+   When a description was generated:
+
+   ```bash
+   <difit-command> <target> [compare-with] \
+     --description "$DESC_FILE" \
+     --comment '{"type":"thread","filePath":"src/foobar.ts","position":{"side":"old","line":102},"body":"line 1\nline 2"}' \
+     --comment '{"type":"thread","filePath":"src/example.ts","position":{"side":"new","line":{"start":36,"end":39}},"body":"Range comment for L36-L39"}'
+   ```
+
+   Without a description (trivial change):
+
+   ```bash
+   <difit-command> <target> [compare-with] \
+     --comment '...'
+   ```
+
+   - **difit launch options**
+     - Use `<difit-command> <target> [compare-with]` to specify the target diff.
+     - For uncommitted changes use `<difit-command> .`, for working tree changes use `<difit-command> working`, and for staged changes use `<difit-command> staging`.
+     - For stdin input, use a form such as `diff -u file1.txt file2.txt | <difit-command>`.
+   - **Comment arguments**
+     - Use `type: "thread"` for each comment.
+     - Write comment bodies in the language the user is using.
+     - Use `position.side: "new"` for lines that exist on the target side of the diff.
+     - Use `position.side: "old"` for lines that exist only on the deleted side.
+     - Use range comments for issues that span multiple lines.
+     - Never copy secrets, tokens, passwords, API keys, private keys, or other credential-like material from the diff into `--comment` bodies or any command-line arguments.
+   - **Additional argument for files not yet added to git**
+     - For uncommitted changes, if you decide files not yet added to git should also appear in the diff, add `--include-untracked`.
+
+5. **Share the difit URL and finish the response.**
    - If there were no comments to attach, explicitly say so.
    - No manual verification of the launched difit page is required.
