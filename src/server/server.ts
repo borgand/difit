@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { createHash } from 'crypto';
+import { writeFileSync } from 'fs';
 import { type Server } from 'http';
 import { join, dirname, isAbsolute, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
@@ -55,6 +56,7 @@ interface ServerOptions {
   repoPath?: string;
   contextLines?: number;
   descriptionContent?: string;
+  reviewOutputPath?: string;
 }
 
 const GENERATED_STATUS_CACHE_TTL_MS = 60_000;
@@ -749,6 +751,12 @@ export async function startServer(
     }
   });
 
+  // Trigger a file write of all comment sessions (used by the SIGINT handler in the CLI).
+  app.post('/api/finalize-review-output', (_req, res) => {
+    writeReviewOutputFile();
+    res.status(204).end();
+  });
+
   app.post('/api/open-in-editor', async (req, res) => {
     if (options.stdinDiff) {
       res.status(400).json({ error: 'Open in editor is not available for stdin diff' });
@@ -834,11 +842,32 @@ export async function startServer(
     }
   });
 
-  // Function to output comments when server shuts down
+  // Collect comments from every session, not just the currently active selection.
+  function collectAllCommentSections(): string[] {
+    const sections: string[] = [];
+    for (const session of commentSessions.values()) {
+      if (session.threads.length > 0) {
+        sections.push(formatCommentsOutput(session.threads.map(toCommentThread)));
+      }
+    }
+    return sections;
+  }
+
   function outputFinalComments() {
-    const session = getOrCreateCommentSession(currentCommentSelection);
-    if (session.threads.length > 0) {
-      console.log(formatCommentsOutput(session.threads.map(toCommentThread)));
+    const sections = collectAllCommentSections();
+    if (sections.length > 0) {
+      console.log(sections.join('\n'));
+    }
+  }
+
+  function writeReviewOutputFile() {
+    if (!options.reviewOutputPath) return;
+    const sections = collectAllCommentSections();
+    const content = sections.length > 0 ? sections.join('\n') : '(no comments)\n';
+    try {
+      writeFileSync(options.reviewOutputPath, content, 'utf8');
+    } catch (error) {
+      console.error(`Failed to write review output to ${options.reviewOutputPath}:`, error);
     }
   }
 
@@ -889,6 +918,7 @@ export async function startServer(
           // Stop file watcher
           await fileWatcher.stop();
 
+          writeReviewOutputFile();
           outputFinalComments();
           process.exit(0);
         }, 100);

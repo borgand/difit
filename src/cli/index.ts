@@ -174,6 +174,7 @@ interface CliOptions {
   context?: number;
   mergeBase?: boolean;
   description?: string;
+  reviewOutput?: string;
 }
 
 const BACKGROUND_CHILD_ENV = 'DIFIT_BACKGROUND_CHILD';
@@ -224,6 +225,10 @@ program
   .option(
     '--description <path>',
     'path to a Markdown file (.md/.markdown) shown as a Description tab in the UI',
+  )
+  .option(
+    '--review-output <path>',
+    'write all review comments to this file when the server shuts down (written even when there are no comments)',
   )
   .action(async (commitish: string, compareWith: string | undefined, options: CliOptions) => {
     try {
@@ -357,6 +362,7 @@ program
           keepAlive: options.keepAlive,
           ...(commentImports.length > 0 ? { commentImports } : {}),
           ...(descriptionContent !== undefined ? { descriptionContent } : {}),
+          ...(options.reviewOutput !== undefined ? { reviewOutputPath: options.reviewOutput } : {}),
         });
 
         if (backgroundMode) {
@@ -369,7 +375,12 @@ program
         if (options.keepAlive) {
           console.log('🔒 Keep-alive mode: server will stay running after browser disconnects');
         }
+        if (options.reviewOutput) {
+          console.log(`📝 Review output will be written to: ${options.reviewOutput}`);
+        }
         console.log('\nPress Ctrl+C to stop the server');
+
+        registerShutdownHandler(port, options.reviewOutput);
         return;
       }
 
@@ -454,6 +465,7 @@ program
         repoPath,
         ...(commentImports.length > 0 ? { commentImports } : {}),
         ...(descriptionContent !== undefined ? { descriptionContent } : {}),
+        ...(options.reviewOutput !== undefined ? { reviewOutputPath: options.reviewOutput } : {}),
       });
 
       if (backgroundMode) {
@@ -472,6 +484,10 @@ program
         console.log('🧹 Starting with a clean slate - all existing comments will be cleared');
       }
 
+      if (options.reviewOutput) {
+        console.log(`📝 Review output will be written to: ${options.reviewOutput}`);
+      }
+
       if (isEmpty) {
         console.log(
           '\n! \x1b[33mNo differences found. Browser will not open automatically.\x1b[0m',
@@ -483,24 +499,7 @@ program
         console.log('💡 Use --open to automatically open browser\n');
       }
 
-      process.on('SIGINT', async () => {
-        console.log('\n👋 Shutting down difit server...');
-
-        // Try to fetch comments before shutting down
-        try {
-          const response = await fetch(`http://localhost:${port}/api/comments-output`);
-          if (response.ok) {
-            const data = await response.text();
-            if (data.trim()) {
-              console.log(data);
-            }
-          }
-        } catch {
-          // Silently ignore fetch errors during shutdown
-        }
-
-        process.exit(0);
-      });
+      registerShutdownHandler(port, options.reviewOutput);
     } catch (error) {
       console.error('Error:', error instanceof Error ? error.message : 'Unknown error');
       process.exit(1);
@@ -508,6 +507,29 @@ program
   });
 
 void program.parseAsync();
+
+function registerShutdownHandler(port: number, reviewOutputPath: string | undefined) {
+  process.on('SIGINT', async () => {
+    console.log('\n👋 Shutting down difit server...');
+
+    try {
+      if (reviewOutputPath) {
+        await fetch(`http://localhost:${port}/api/finalize-review-output`, { method: 'POST' });
+      }
+      const response = await fetch(`http://localhost:${port}/api/comments-output`);
+      if (response.ok) {
+        const data = await response.text();
+        if (data.trim()) {
+          console.log(data);
+        }
+      }
+    } catch {
+      // Silently ignore fetch errors during shutdown
+    }
+
+    process.exit(0);
+  });
+}
 
 async function handleUntrackedFiles(git: SimpleGit, addAutomatically?: boolean): Promise<void> {
   const files = await findUntrackedFiles(git);

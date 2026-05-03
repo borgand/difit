@@ -44,10 +44,17 @@ Before running commands, choose `<difit-command>` using the following rule:
 
 4. **Attach the prepared comments and launch difit.**
 
+   Set up the review output path first:
+
+   ```bash
+   REVIEW_OUTPUT="${TMPDIR}difit-review-$$.txt"
+   ```
+
    When a description was generated:
 
    ```bash
    <difit-command> <target> [compare-with] \
+     --review-output "$REVIEW_OUTPUT" \
      --description "$DESC_FILE" \
      --comment '{"type":"thread","filePath":"src/foobar.ts","position":{"side":"old","line":102},"body":"line 1\nline 2"}' \
      --comment '{"type":"thread","filePath":"src/example.ts","position":{"side":"new","line":{"start":36,"end":39}},"body":"Range comment for L36-L39"}'
@@ -57,12 +64,13 @@ Before running commands, choose `<difit-command>` using the following rule:
 
    ```bash
    <difit-command> <target> [compare-with] \
+     --review-output "$REVIEW_OUTPUT" \
      --comment '...'
    ```
 
+   - **Argument order** — `<difit-command> <target> [compare-with]` is **reversed from `git diff from to`**. The first positional is the **target** (what is being reviewed, right side); the optional second positional is the **base** (what to compare against, left side). So `difit feature main` ≈ `git diff main feature`.
    - **difit launch options**
-     - Use `<difit-command> <target> [compare-with]` to specify the target diff.
-     - For uncommitted changes use `<difit-command> .`, for working tree changes use `<difit-command> working`, and for staged changes use `<difit-command> staging`.
+     - For uncommitted changes use `<difit-command> .`, for working tree changes use `<difit-command> working`, and for staged changes use `<difit-command> staged`.
      - For stdin input, use a form such as `diff -u file1.txt file2.txt | <difit-command>`.
    - **Comment arguments**
      - Use `type: "thread"` for each comment.
@@ -74,6 +82,13 @@ Before running commands, choose `<difit-command>` using the following rule:
    - **Additional argument for files not yet added to git**
      - For uncommitted changes, if you decide files not yet added to git should also appear in the diff, add `--include-untracked`.
 
-5. **Share the difit URL and finish the response.**
-   - If there were no comments to attach, explicitly say so.
-   - No manual verification of the launched difit page is required.
+5. **Read the review output and react.**
+
+   After difit exits, read the output file:
+
+   ```bash
+   cat "$REVIEW_OUTPUT"
+   ```
+
+   - **If the file contains comments** — integrate every comment and reply into your work. Address each point, then summarize what was done.
+   - **If the file contains `(no comments)` or is absent** — ask the user: _"difit closed without any comments. Was that intentional, or did the browser close by accident? I can reopen it if needed."_ Do not silently assume the review is complete.

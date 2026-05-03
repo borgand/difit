@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as pathJoin } from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Set environment variable to skip fetch mocking
@@ -1453,6 +1456,79 @@ describe('Server Integration Tests', () => {
       const response2 = await fetch(`http://localhost:${port}/api/diff?ignoreWhitespace=true`);
       const data2 = (await response2.json()) as any;
       expect(data2.clearComments).toBe(true);
+    });
+  });
+
+  describe('Review output file (--review-output)', () => {
+    it('POST /api/finalize-review-output returns 204 and writes (no comments) when no comments exist', async () => {
+      const outputPath = pathJoin(tmpdir(), `difit-review-test-${Date.now()}.txt`);
+      const { port, server } = await startServer({
+        selection: { targetCommitish: 'HEAD', baseCommitish: 'HEAD^' },
+        reviewOutputPath: outputPath,
+      });
+      servers.push(server);
+
+      // Trigger finalization
+      const res = await fetch(`http://localhost:${port}/api/finalize-review-output`, {
+        method: 'POST',
+      });
+      expect(res.status).toBe(204);
+
+      // File should exist and contain the no-comments marker
+      expect(existsSync(outputPath)).toBe(true);
+      const content = readFileSync(outputPath, 'utf8');
+      expect(content.trim()).toBe('(no comments)');
+
+      // Cleanup
+      unlinkSync(outputPath);
+    });
+
+    it('POST /api/finalize-review-output writes all comment threads to the output file', async () => {
+      const outputPath = pathJoin(tmpdir(), `difit-review-test-${Date.now()}.txt`);
+      const { port, server } = await startServer({
+        selection: { targetCommitish: 'HEAD', baseCommitish: 'HEAD^' },
+        reviewOutputPath: outputPath,
+      });
+      servers.push(server);
+
+      // Seed a comment via the comment-imports endpoint
+      const commentImport = {
+        type: 'thread',
+        filePath: 'src/foo.ts',
+        position: { side: 'new', line: 10 },
+        body: 'review comment body',
+      };
+      await fetch(`http://localhost:${port}/api/comment-imports`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([commentImport]),
+      });
+
+      // Trigger finalization
+      const res = await fetch(`http://localhost:${port}/api/finalize-review-output`, {
+        method: 'POST',
+      });
+      expect(res.status).toBe(204);
+
+      const content = readFileSync(outputPath, 'utf8');
+      expect(content).toContain('src/foo.ts');
+      expect(content).toContain('review comment body');
+
+      // Cleanup
+      unlinkSync(outputPath);
+    });
+
+    it('does not write a file when reviewOutputPath is not set', async () => {
+      const { port, server } = await startServer({
+        selection: { targetCommitish: 'HEAD', baseCommitish: 'HEAD^' },
+      });
+      servers.push(server);
+
+      // Endpoint should still return 204 even without a path (no-op)
+      const res = await fetch(`http://localhost:${port}/api/finalize-review-output`, {
+        method: 'POST',
+      });
+      expect(res.status).toBe(204);
     });
   });
 });

@@ -21,6 +21,25 @@ Object.defineProperty(window, 'getComputedStyle', {
   }),
 });
 
+// happy-dom v20 has a proxy bug in its Storage implementation that causes
+// localStorage.clear() to return undefined in the forks pool. Replace both
+// localStorage and sessionStorage with a reliable in-memory implementation.
+function createStorage() {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => store.set(key, String(value)),
+    removeItem: (key: string) => store.delete(key),
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+}
+Object.defineProperty(window, 'localStorage', { value: createStorage(), configurable: true });
+Object.defineProperty(window, 'sessionStorage', { value: createStorage(), configurable: true });
+
 // Global test utilities
 export const mockFetch = (response: any, revisionsResponse?: any) => {
   (global.fetch as any).mockImplementation((url: string) => {
