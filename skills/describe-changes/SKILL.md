@@ -48,12 +48,18 @@ Use this layered structure. Each layer should **add detail on top of the previou
    ```
    ````
 
+   **Mermaid syntax rules** — these prevent the most common parse failures:
+   - Quote every label that isn't a single plain word: `A["My label: detail"]`, never `A[My label: detail]`. Colons, slashes, parentheses, and Unicode characters are safe inside quoted labels.
+   - Use `\n` for line breaks inside a quoted label: `A["line one\nline two"]`. Do not use HTML.
+   - Subgraphs with multi-word titles use the explicit form: `subgraph id ["Title with spaces"]`.
+   - Edge labels: prefer `A -->|label| B`; if the label contains `|`, `]`, or quotes, use `A -- "label" --> B`.
+
 4. **Code walk-through**. Order sections by **logical reading flow**, not by filename. For each step:
    - a heading with the _purpose_ of the step (not the filename),
    - a reference to the primary file and line with `path:line`,
    - one or two sentences on _what_ changed there and _why this step matters before the next_.
 
-   Add further Mermaid sequence or flow diagrams whenever they clarify control flow (request lifecycle, state transitions, etc.).
+   Add further Mermaid sequence or flow diagrams whenever they clarify control flow (request lifecycle, state transitions, etc.). Follow the same syntax rules as step 3.
 
 5. **Risks and follow-ups**. Anything the reviewer should pay extra attention to: known edge cases, deferred work, migrations needed, rollout concerns.
 

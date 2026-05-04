@@ -109,9 +109,10 @@ export function MermaidDiagram({ chart }: MermaidDiagramProps) {
   if (error) {
     return (
       <div className="space-y-2">
-        <div className="text-sm text-github-danger" title={error}>
-          Unable to render Mermaid diagram.
-        </div>
+        <details className="text-sm text-github-danger" open>
+          <summary>Unable to render Mermaid diagram.</summary>
+          <pre className="mt-2 whitespace-pre-wrap text-xs">{error}</pre>
+        </details>
         <pre className="markdown-preview-code whitespace-pre-wrap border border-github-border bg-github-bg-secondary p-3 overflow-x-auto text-sm font-mono text-github-text-primary">
           {chart}
         </pre>

@@ -346,6 +346,7 @@ describe('MarkdownDiffViewer', () => {
     fireEvent.click(fullPreviewButton);
 
     expect(await screen.findByText('Unable to render Mermaid diagram.')).toBeInTheDocument();
+    expect(screen.getByText('Parse error')).toBeInTheDocument();
     expect(
       screen.getByText(
         (_, element) => element?.tagName === 'PRE' && element.textContent === 'graph TD\n  A --> B',
