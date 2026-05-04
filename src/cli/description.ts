@@ -1,16 +1,8 @@
 import { realpathSync, statSync, readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { extname, isAbsolute, resolve, sep } from 'node:path';
+import { extname, isAbsolute, resolve } from 'node:path';
 
 const MAX_DESCRIPTION_BYTES = 1024 * 1024;
 const ALLOWED_EXTENSIONS = new Set(['.md', '.markdown']);
-
-function isInside(candidate: string, root: string): boolean {
-  if (candidate === root) {
-    return true;
-  }
-  return candidate.startsWith(root + sep);
-}
 
 export function loadDescription(inputPath: string): { content: string; resolvedPath: string } {
   if (typeof inputPath !== 'string' || inputPath.trim().length === 0) {
@@ -29,14 +21,6 @@ export function loadDescription(inputPath: string): { content: string; resolvedP
     resolvedPath = realpathSync(absoluteInput);
   } catch {
     throw new Error(`Description file not found: ${inputPath}`);
-  }
-
-  const cwdReal = realpathSync(process.cwd());
-  const tmpReal = realpathSync(tmpdir());
-  if (!isInside(resolvedPath, cwdReal) && !isInside(resolvedPath, tmpReal)) {
-    throw new Error(
-      '--description path must resolve inside the current working directory or the system temp directory',
-    );
   }
 
   const stats = statSync(resolvedPath);

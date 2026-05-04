@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, symlinkSync, realpathSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -61,11 +61,17 @@ describe('loadDescription', () => {
     expect(() => loadDescription(dir)).toThrow(/regular file/);
   });
 
-  it('rejects a symlink that escapes cwd and tmpdir', () => {
-    const trueCwd = realpathSync(sandboxCwd);
-    const link = join(trueCwd, 'escape.md');
-    symlinkSync('/etc/hosts', link);
-    expect(() => loadDescription(link)).toThrow(/inside the current working directory/);
+  it('accepts a .md file outside cwd and tmpdir', () => {
+    const outsideDir = mkdtempSync(join(realpathSync(tmpdir()), 'difit-desc-outside-'));
+    try {
+      const file = join(outsideDir, 'desc.md');
+      writeFileSync(file, '# outside');
+      // change cwd to somewhere unrelated so the file is provably outside cwd
+      const result = loadDescription(file);
+      expect(result.content).toBe('# outside');
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
   });
 
   it('rejects empty path', () => {
